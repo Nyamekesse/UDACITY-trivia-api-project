@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Integer, create_engine
 from flask_sqlalchemy import SQLAlchemy
 import json
 
-database_name = 'trivia'
+database_name = 'trivia_test'
 database_path = 'postgresql://{}:{}@{}/{}'.format(
     'student', 'student', 'localhost:5432', database_name)
 
@@ -79,6 +79,10 @@ class Category(db.Model):
 
     def __init__(self, type):
         self.type = type
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
 
     def format(self):
         return {
