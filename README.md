@@ -4,7 +4,7 @@ Trivia fun game webapp is an online game which aims at creating a bond between p
 By playing this game users will be able to gain a lot of knowledge in most interesting fields.
 
 The front end is built with Javascript and backend in Python, both languages follow ES6 and PEP8 style guidelines respectively.
-Click to read more about [ES6](www.javascript.com/es6) or [PEP8 style guidelines](https://www.python.org/dev/peps/pep-0008/)
+Click to read more about [ES6](https://www.w3schools.com/Js/js_es6.asp) or [PEP8 style guidelines](https://www.python.org/dev/peps/pep-0008/)
 
 ---
 
