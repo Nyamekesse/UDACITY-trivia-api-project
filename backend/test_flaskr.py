@@ -5,6 +5,12 @@ from flask_sqlalchemy import SQLAlchemy
 
 from flaskr import create_app
 from models import setup_db, Question, Category
+from dotenv import load_dotenv
+load_dotenv()
+
+
+username = os.getenv("u_name")
+password = os.getenv("u_pwd")
 
 
 class TriviaTestCase(unittest.TestCase):
@@ -16,10 +22,12 @@ class TriviaTestCase(unittest.TestCase):
         self.client = self.app.test_client
         self.database_name = "trivia_test"
         self.database_path = "postgresql://{}:{}@{}/{}".format(
-            'student', 'student', 'localhost:5432', self.database_name)
+            username, password, 'localhost:5432', self.database_name)
         setup_db(self.app, self.database_path)
 
-        self.delete_id = 38
+        # declared variables to be used as parameters
+        self.searchTerm = 'Tom Hanks'
+        self.delete_id = 26
         self.new_question = {'question': 'where is Ghana located',
                              'answer': 'West Africa', 'category': 3, 'difficulty': 1}
         self.new_category = {'category': 'Culture'}
@@ -52,7 +60,7 @@ class TriviaTestCase(unittest.TestCase):
 
         self.assertEqual(res.status_code, 422)
         self.assertEqual(data['success'], False)
-        self.assertEqual(data['message'], 'unprocessable')
+        self.assertEqual(data['message'], 'Not Processable')
 
     def test_get_all_categories(self):
         res = self.client().get('/api/categories')
@@ -79,13 +87,29 @@ class TriviaTestCase(unittest.TestCase):
         self.assertTrue(data['questions'])
         self.assertTrue(data['totalQuestions'])
 
-    def test_get_all_questions_per_category_selected_not_allowed(self):
-        res = self.client().post('/api/categories/2/questions')
+    def test_get_all_questions_per_category_selected_not_found(self):
+        res = self.client().get('/api/categories/20/questions')
         data = json.loads(res.data)
 
-        self.assertEqual(res.status_code, 405)
+        self.assertEqual(res.status_code, 404)
         self.assertEqual(data['success'], False)
-        self.assertEqual(data['message'], 'method not allowed')
+        self.assertEqual(data['message'], 'resource not found')
+
+    def test_add_new_question(self):
+        res = self.client().post('/api/questions/new-question', json=self.new_question)
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(data['success'], True)
+        self.assertTrue(data['created'])
+
+    def test_for_question_creation_without_data(self):
+        res = self.client().post('/api/questions/new-question')
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'Not Processable')
 
     def test_delete_question(self):
         res = self.client().delete(f'/api/questions/{self.delete_id}')
@@ -96,28 +120,12 @@ class TriviaTestCase(unittest.TestCase):
         self.assertTrue(data['deleted'])
 
     def test_for_error_delete_nonexisting_id(self):
-        res = self.client().delete('/api/questions/240')
+        res = self.client().delete(f'/api/questions/{self.delete_id}')
         data = json.loads(res.data)
 
         self.assertEqual(res.status_code, 422)
         self.assertEqual(data['success'], False)
-        self.assertEqual(data['message'], 'unprocessable')
-
-    def test_add_new_question(self):
-        res = self.client().post('/api/questions/new-question', json=self.new_question)
-        data = json.loads(res.data)
-
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(data['success'], True)
-        self.assertTrue(data['question'])
-
-    def test_for_question_creation_without_data(self):
-        res = self.client().post('/api/questions/new-question')
-        data = json.loads(res.data)
-
-        self.assertEqual(res.status_code, 422)
-        self.assertEqual(data['success'], False)
-        self.assertEqual(data['message'], 'unprocessable')
+        self.assertEqual(data['message'], 'Not Processable')
 
     def test_add_new_category(self):
         res = self.client().post('/api/categories/new-category', json=self.new_category)
@@ -133,11 +141,11 @@ class TriviaTestCase(unittest.TestCase):
 
         self.assertEqual(res.status_code, 422)
         self.assertEqual(data['success'], False)
-        self.assertEqual(data['message'], 'unprocessable')
+        self.assertEqual(data['message'], 'Not Processable')
 
     def test_for_question_search(self):
         res = self.client().post(
-            '/api/questions/search', json={'searchTerm': 'Tom Hanks'})
+            '/api/questions/search', json={'searchTerm': f'{self.searchTerm}'})
         data = json.loads(res.data)
 
         self.assertEqual(res.status_code, 200)
@@ -162,14 +170,14 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(data['success'], True)
         self.assertTrue(data['question'])
 
-    def test_get_single_random_question_without_category_id(self):
-        res = self.client().post('/api/quizzes', json={'previous_questions': [],
-                                                       'quiz_category': {'type': 'Science', 'id': ''}})
+    def test_get_single_random_question_without_quiz_category(self):
+        res = self.client().post(
+            '/api/quizzes', json={'previous_questions': []})
         data = json.loads(res.data)
 
-        self.assertEqual(res.status_code, 422)
+        self.assertEqual(res.status_code, 400)
         self.assertEqual(data['success'], False)
-        self.assertEqual(data['message'], 'unprocessable')
+        self.assertEqual(data['message'], 'bad request')
 
 
 # Make the tests conveniently executable

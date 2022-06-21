@@ -14,7 +14,7 @@ def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__)
     setup_db(app)
-    CORS(app, resources={r"/api/*": {'origins': '*'}})
+    CORS(app, resources={r"*": {'origins': '*'}})
 
     # CORS Headers
 
@@ -40,8 +40,8 @@ def create_app(test_config=None):
         start = (page - 1) * QUESTIONS_PER_PAGE
         end = start + QUESTIONS_PER_PAGE
         return [single_question.format() for single_question in selected_questions[start:end]]
-    # endpoint to get all categories
 
+    # endpoint to get all categories
     @app.route('/api/categories', methods=['GET'])
     def get_all_categories():
         """get all the categories in the database
@@ -63,7 +63,7 @@ def create_app(test_config=None):
         except:
             abort(405)
 
-   # endpoint to get paginated question
+    # endpoint to get paginated question
     @app.route('/api/questions', methods=['GET'])
     def get_all_questions():
         """returns all questions in the database, and paginate them
@@ -91,28 +91,31 @@ def create_app(test_config=None):
         except:
             abort(422)
 
-    # end point to delete a single question
-    @app.route('/api/questions/<int:id>', methods=['DELETE'])
-    def delete_question(id):
-        """delete a single question from a database
+    # end point to get questions per category selected
+    @app.route('/api/categories/<int:id>/questions', methods=['GET'])
+    def get_questions_per_category(id):
+        """returns all questions based on a category
 
         Keyword arguments:
-        id -- the id of the question to be deleted
-        Return: 200 upon successful request
+        id -- id of the category
+        Return: category questions
         """
+        # check if the id exists
+        if (Question.query.filter(Question.category == id).first() == None):
+            abort(404)
+        else:
+            try:
+                questions = Question.query.order_by(
+                    Question.id).filter(Question.category == id).all()
 
-        try:
-            question = Question.query.filter(Question.id == id).one_or_none()
-            if question == None:
-                abort(404)
-            else:
-                question.delete()
                 return jsonify({
                     'success': True,
-                    'deleted': id
+                    'questions': [question.format() for question in questions],
+                    'totalQuestions': len(questions),
+                    'currentCategory': 'History'
                 })
-        except:
-            abort(422)
+            except:
+                abort(405)
 
     # end point to create a new question
     @app.route('/api/questions/new-question', methods=['POST'])
@@ -130,14 +133,16 @@ def create_app(test_config=None):
         else:
             try:
                 new_question = Question(question=body.get('question'), answer=body.get(
-                    'answer'), category=body.get('category'), difficulty=body.get('difficulty')).insert()
+                    'answer'), category=body.get('category'), difficulty=body.get('difficulty'))
+                new_question.insert()
                 get_all_current_questions = Question.query.order_by(
                     Question.id).all()
                 paginated_question = paginate_display(request,
                                                       get_all_current_questions)
                 return jsonify({
                     'success': True,
-                    'question': paginated_question
+                    'created': new_question.id,
+                    'total_questions': len(Question.query.all()),
                 })
             except:
                 abort(405)
@@ -175,31 +180,6 @@ def create_app(test_config=None):
             except:
                 abort(404)
 
-    # end point to get questions per category selected
-    @app.route('/api/categories/<int:id>/questions', methods=['GET'])
-    def get_questions_per_category(id):
-        """returns all questions based on a category
-
-        Keyword arguments:
-        id -- id of the category
-        Return: category questions
-        """
-
-        try:
-            questions = Question.query.order_by(
-                Question.id).filter(Question.category == id).all()
-            if len(questions) == 0:
-                abort(404)
-            else:
-                return jsonify({
-                    'success': True,
-                    'questions': [question.format() for question in questions],
-                    'totalQuestions': len(questions),
-                    'currentCategory': 'History'
-                })
-        except:
-            abort(405)
-
     # end point to a single random question
     @app.route('/api/quizzes', methods=['POST'])
     def get_random_question():
@@ -214,9 +194,8 @@ def create_app(test_config=None):
         body = request.get_json()
         previous_questions = body.get('previous_questions')
         quiz_category = body.get('quiz_category')
-
-        if quiz_category.get('id') == '':
-            abort(422)
+        if not quiz_category:
+            abort(400)
         else:
             try:
                 if (quiz_category.get('id') == 0) and (len(previous_questions) >= 0):
@@ -260,7 +239,7 @@ def create_app(test_config=None):
     # end point to create a new category
     @ app.route('/api/categories/new-category', methods=['POST'])
     def create_new_category():
-        """add new category to the categories
+        """Add new category to the categories
 
         Keyword arguments:
         json -- contains the category name to be added
@@ -268,21 +247,48 @@ def create_app(test_config=None):
         """
 
         body = request.get_json()
-        if body == None:
+        if not body:
             abort(422)
         else:
             try:
-                new_category = Category(type=body.get('category')).insert()
+                new_category = Category(type=body.get('category'))
+                new_category.insert()
                 get_all_current_categories = [category.format() for category in Category.query.order_by(
                     Category.id).all()]
                 return jsonify({
                     'success': True,
+                    'created': new_category.id,
+                    'total_categories': len(get_all_current_categories),
                     'categories': get_all_current_categories
                 })
             except:
                 abort(405)
-    # error handlers
 
+    # end point to delete a single question
+    @app.route('/api/questions/<int:id>', methods=['DELETE'])
+    def delete_question(id):
+        """delete a single question from a database
+
+        Keyword arguments:
+        id -- the id of the question to be deleted
+        Return: 200 upon successful deletion
+        """
+
+        try:
+            question = Question.query.filter(Question.id == id).one_or_none()
+            if not question:
+                abort(404)
+            else:
+                question.delete()
+                return jsonify({
+                    'success': True,
+                    'deleted': id,
+                    'total_questions': len(Question.query.all())
+                })
+        except:
+            abort(422)
+
+    # error handlers
     @ app.errorhandler(404)
     def not_found(error):
         return jsonify({
@@ -304,7 +310,7 @@ def create_app(test_config=None):
         return jsonify({
             'success': False,
             'error': 422,
-            'message': 'unprocessable'
+            'message': 'Not Processable'
         }), 422
 
     @ app.errorhandler(400)
